@@ -43,15 +43,15 @@ impl StateMachine for WeirdSwitchMachine {
 
 	fn next_state(starting_state: &TwoSwitches, t: &Toggle) -> TwoSwitches {
 		match t {
-			Toggle::FirstSwitch => {
+			Self::Transition::FirstSwitch => {
 				if starting_state.first_switch {
-					TwoSwitches{ first_switch: false, second_switch: false }
+					Self::State{ first_switch: false, second_switch: false }
 				} else {
-					TwoSwitches{ first_switch: true, second_switch: starting_state.second_switch }
+					Self::State{ first_switch: true, second_switch: starting_state.second_switch }
 				}
 			}
-			Toggle::SecondSwitch => {
-				TwoSwitches {
+			Self::Transition::SecondSwitch => {
+				Self::State {
 					first_switch: starting_state.first_switch,
 					second_switch: if starting_state.second_switch { false } else { true }}
 			}
