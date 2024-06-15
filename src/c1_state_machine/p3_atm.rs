@@ -3,7 +3,7 @@
 //! entered the wrong pin.
 
 use super::StateMachine;
-
+use core::iter::zip;
 /// The keys on the ATM keypad
 #[derive(Hash, Debug, PartialEq, Eq, Clone)]
 pub enum Key {
@@ -12,6 +12,18 @@ pub enum Key {
 	Three,
 	Four,
 	Enter,
+}
+
+impl From<Key> for u64 {
+	fn from(key: Key) -> Self {
+		match key {
+			Key::One => {1}
+			Key::Two => {2}
+			Key::Three => {3}
+			Key::Four => {4}
+			_ => {0}
+		}
+	}
 }
 
 /// Something you can do to the ATM
@@ -59,7 +71,69 @@ impl StateMachine for Atm {
 	type Transition = Action;
 
 	fn next_state(starting_state: &Self::State, t: &Self::Transition) -> Self::State {
-		todo!("Exercise 4")
+
+		match t {
+			Action::PressKey(key) => {
+				let cash = starting_state.cash_inside.clone();
+				let auth = starting_state.expected_pin_hash.clone();
+				let mut key_strokes = starting_state.keystroke_register.clone();
+
+				match &starting_state.expected_pin_hash {
+					Auth::Authenticated => {
+						match key {
+							Key::Enter => {
+								let count: u32 = key_strokes.len() as u32;
+								let withdraw: u64 = key_strokes.iter().enumerate().map(|(idx, element)| {
+									let power: u64 = 10_u32.pow(count - idx as u32 - 1) as u64;
+									let num: u64 = <Key as Into<u64>>::into(element.clone()) as u64;
+									num * power
+								}).sum::<u64>();
+
+								let final_balance: i64 = (cash as i64 - withdraw as i64);
+								if  final_balance < 0 {
+									Self{ cash_inside: cash, expected_pin_hash: Auth::Waiting, keystroke_register: Vec::new() }
+								} else {
+									Self { cash_inside: final_balance as u64, expected_pin_hash: Auth::Waiting, keystroke_register: Vec::new() }
+								}
+							}
+							_ => {
+								key_strokes.push(key.clone());
+								Self{ cash_inside: cash, expected_pin_hash:Auth::Authenticated, keystroke_register:key_strokes }
+							}
+						}
+					}
+					Auth::Authenticating(pin) => {
+						match key {
+							Key::Enter => {
+								if crate::hash(&key_strokes) == *pin {
+									Self{ cash_inside:cash,
+										expected_pin_hash: Auth::Authenticated,
+										keystroke_register: Vec::new() }
+								} else {
+									Self{ cash_inside: cash, expected_pin_hash: Auth::Waiting, keystroke_register: Vec::new() }
+								}
+							}
+							_ => {
+								key_strokes.push(key.clone());
+								Self{ cash_inside:10, expected_pin_hash:Auth::Authenticating(*pin), keystroke_register: key_strokes }
+							}
+						}
+					}
+					Auth::Waiting => {Self{ cash_inside:cash, expected_pin_hash:auth, keystroke_register: Vec::new() }}
+				}
+			}
+			Action::SwipeCard(pin) => {
+				let cash = starting_state.cash_inside.clone();
+				let auth = starting_state.expected_pin_hash.clone();
+				let mut key_strokes = starting_state.keystroke_register.clone();
+
+				match &starting_state.expected_pin_hash {
+					Auth::Authenticated => {Self{ cash_inside:10, expected_pin_hash:Auth::Authenticated, keystroke_register: Vec::new() }}
+					Auth::Authenticating(pin) => {Self{ cash_inside:cash, expected_pin_hash:auth, keystroke_register: key_strokes }}
+					Auth::Waiting => {Self{ cash_inside:cash, expected_pin_hash:Auth::Authenticating(*pin), keystroke_register: Vec::new() }}
+				}
+			}
+		}
 	}
 }
 
